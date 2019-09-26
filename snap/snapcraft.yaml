@@ -1,0 +1,151 @@
+name: tribler-bittorrent
+version: latest
+version-script: cat $SNAPCRAFT_STAGE/version
+summary: Tribler
+description: >
+  Privacy using Tor-inspired anonymous onion routing
+
+grade: stable
+confinement: classic
+base: core18
+
+architectures:
+  - build-on: amd64
+
+parts:
+  desktop-qt5:
+    source: https://github.com/ubuntu/snapcraft-desktop-helpers.git
+    source-subdir: qt
+    plugin: make
+    make-parameters: ["FLAVOR=qt5"]
+    build-packages:
+      - build-essential
+      - qtbase5-dev
+      - dpkg-dev
+    stage-packages:
+      - libxkbcommon0
+      - ttf-ubuntu-font-family
+      - dmz-cursor-theme
+      - light-themes
+      - adwaita-icon-theme
+      - gnome-themes-standard
+      - shared-mime-info
+      - libqt5gui5
+      - libgdk-pixbuf2.0-0
+      - libqt5svg5 # for loading icon themes which are svg
+      - try: [appmenu-qt5] # not available on core18
+      - locales-all
+      - xdg-user-dirs
+      - fcitx-frontend-qt5
+  python-deps:
+    plugin: python
+    python-version: python2
+    source: .
+    python-packages:
+      - matplotlib==2.0.2
+      - pony>=0.7.9
+      - lz4
+  tribler:
+    after:
+      - python-deps
+      - desktop-qt5
+    plugin: dump
+    source-type: deb
+    source: https://github.com/Tribler/tribler/releases/download/v7.3.0/tribler_7.3.0_all.deb
+    override-build: |
+      DEB_API="https://github.com/Tribler/tribler/releases/download/v7.3.0/tribler_7.3.0_all.deb"
+      VERSION=$(echo $DEB_API| rev | cut -d/ -f1|rev|cut -d_ -f2|cut -d'-' -f 1,2)
+      echo $VERSION > $SNAPCRAFT_STAGE/version
+
+      snapcraftctl build
+
+      set -ex
+      for dir in $SNAPCRAFT_PART_INSTALL/usr/lib/*/; do
+        (cd $dir;
+         if [ -f blas/libblas.so.3.* ]; then
+           ln -s blas/libblas.so.3.* libblas.so.3
+         fi
+         if [ -f lapack/liblapack.so.3.* ]; then
+           ln -s lapack/liblapack.so.3.* liblapack.so.3
+         fi
+         )
+      done
+      chmod +x $SNAPCRAFT_PART_INSTALL/usr/share/tribler/run_tribler.py
+    stage-packages:
+      - libgpm2
+      - libglu1-mesa
+      - libslang2
+      - libatlas-base-dev
+      - libblas3
+      - libblas-dev
+      - libxcomposite1
+      - libxcursor1
+      - libxinerama1
+      - libatk1.0-0
+      - libgtk2.0-0
+      - liblapack3
+      - libx11-xcb1
+      - libxcb-xkb1
+      - libxcb-icccm4
+      - libxcb-image0
+      - libxcb-render-util0
+      - python2.7
+      - python-minimal
+      - python-pip
+      - python-six
+      - python-apsw
+      - python-chardet
+      - python-cherrypy3
+      - python-configobj
+      - python-cryptography
+      - python-decorator
+      - python-feedparser
+      - python-leveldb
+      - python-libnacl
+      - python-libtorrent
+      - python-m2crypto
+      - python-numpy
+      - python-meliae
+      - python-netifaces
+      - python-networkx
+      - python-pil
+      - python-psutil
+      - python-pyqt5
+      - python-pyqt5.qtsvg
+      - python-twisted
+      - python-socks
+      - python-pyqtgraph
+      - vlc
+      - python-faulthandler
+      - python-tk
+      - libappindicator3-1
+      - libasound2
+      - libcurl3-gnutls
+      - libgconf-2-4
+      - libgtk-3-0
+      - libnotify4
+      - libnspr4
+      - libnss3
+      - libpcre3
+      - libpulse0
+      - libxss1
+      - libxtst6
+      - qtwayland5
+
+apps:
+  tribler:
+    command: usr/bin/python ${SNAP}/usr/share/tribler/run_tribler.py "$@" > `mktemp tmp/$USER-tribler-XXXXXXXX.log` 2>&1
+  tribler-bittorrent:
+    command: desktop-launch ${SNAP}/usr/bin/python ${SNAP}/usr/share/tribler/run_tribler.py
+    environment:
+      DISABLE_WAYLAND: 1
+    plugs:
+      - desktop
+      - desktop-legacy
+      - wayland
+      - unity7
+      - home
+      - network
+      - network-bind
+      - pulseaudio
+      - network-manager
